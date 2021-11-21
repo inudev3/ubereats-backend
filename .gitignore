@@ -1,0 +1,11 @@
+/node_modules
+.idea
+.env
+.env.dev
+.env.test
+
+.cache
+/dist
+.parcel-cache
+
+.next

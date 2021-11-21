@@ -1,0 +1,18 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type Restaurant {
+  id: Float!
+  name: String!
+  isGood: Boolean
+}
+
+type Query {
+  isGood: Boolean!
+  restaurants(veganOnly: Boolean!): [Restaurant!]!
+}
+
+type Mutation {
+  createRestaurant(name: String!, address: String!, owner: String!, isGood: Boolean!): Boolean!
+}
