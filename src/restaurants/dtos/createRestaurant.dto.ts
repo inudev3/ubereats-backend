@@ -1,22 +1,11 @@
-import { ArgsType, Field } from '@nestjs/graphql';
-import { IsBoolean, IsString, Length } from 'class-validator';
+import { ArgsType, InputType, OmitType } from '@nestjs/graphql';
+
+import { Restaurant } from '../entities/restaurant.entity';
 
 @ArgsType()
-export class createRestaurantDto {
-  @Field(() => String)
-  @Length(5, 10)
-  @IsString()
-  name: string;
-
-  @Field(() => String)
-  @IsString()
-  address: string;
-
-  @Field(() => String)
-  @IsString()
-  owner: string;
-
-  @Field(() => Boolean)
-  @IsBoolean()
-  isGood: string;
-}
+export class createRestaurantDto extends OmitType(
+  Restaurant,
+  ['id'],
+  ArgsType,
+) {} //Mapped Types allows you to change decorateor from parent class됨
+//또는 entity에 InputType을 isAbstact:true로 설정해도 됨
