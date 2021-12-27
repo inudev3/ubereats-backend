@@ -9,27 +9,27 @@ export class MailService {
     @Inject(CONFIG_OPTIONS) private readonly options: MailModuleOption,
   ) {}
 
-  private async sendEmail(
+  async sendEmail(
+    //you can't test with private
     subject: string,
     template: string,
     to: string,
     emailVars: EmailVar,
-  ) {
+  ): Promise<boolean> {
     const form = new FormData();
     form.append('from', `Inu from UberEats <mailgun@${this.options.domain}>`);
     form.append('to', `inust33@gmail.com`);
     form.append('subject', `${subject}`);
     form.append('template', `${template}`);
 
-    Object.keys(emailVars).forEach((key) =>
-      form.append(`v:${key}`, emailVars[key]),
+    Object.entries(emailVars).forEach(([key, val]) =>
+      form.append(`v:${key}`, val),
     );
 
     try {
-      const response = await got(
+      const response = await got.post(
         `https://api.mailgun.net/v3/${this.options.domain}/messages`,
         {
-          method: 'POST',
           headers: {
             Authorization: `Basic$ ${Buffer.from(
               `api:${this.options.apiKey}`,
@@ -38,8 +38,10 @@ export class MailService {
           body: form,
         },
       );
+      return true;
     } catch (e) {
-      console.log(e);
+      // console.log(e); //you can't test console.log
+      return false;
     }
   }
   sendVerificationEmail(email: string, code: string, to: string) {
