@@ -2,7 +2,7 @@ import { IsOptional, IsString } from 'class-validator';
 import { Field, ObjectType } from '@nestjs/graphql';
 
 @ObjectType()
-export class MutationOutput {
+export class CoreOutput {
   @Field(() => Boolean)
   ok: boolean;
   @Field(() => String, { nullable: true })

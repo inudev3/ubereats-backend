@@ -1,4 +1,4 @@
-import { BeforeInsert, BeforeUpdate, Column, Entity } from 'typeorm';
+import { BeforeInsert, BeforeUpdate, Column, Entity, OneToMany } from 'typeorm';
 
 import {
   ArgsType,
@@ -9,20 +9,21 @@ import {
 } from '@nestjs/graphql';
 import * as bcrypt from 'bcrypt';
 import { InternalServerErrorException } from '@nestjs/common';
-import { IsEmail, IsEnum, Length } from 'class-validator';
-import { CoreEntity } from "src/common/entities/core.entity";
+import { IsBoolean, IsEmail, IsEnum, IsString, Length } from 'class-validator';
+import { CoreEntity } from 'src/common/entities/core.entity';
+import { Restaurant } from '../../restaurants/entities/restaurant.entity';
 
-enum UserRole {
-  Client,
-  Owner,
-  Delivery,
+export enum UserRole {
+  Client = 'Client',
+  Owner = 'Owner',
+  Delivery = 'Delivery',
 }
 registerEnumType(UserRole, { name: 'UserRole' }); //graphql ENUM type register
-@InputType({ isAbstract: true })
+@InputType('UserInputType', { isAbstract: true })
 @ObjectType()
 @Entity()
 export class User extends CoreEntity {
-  @Column()
+  @Column({ unique: true })
   @Field(() => String)
   @IsEmail()
   email: string;
@@ -30,6 +31,7 @@ export class User extends CoreEntity {
   @Column({ select: false })
   @Field(() => String)
   @Length(5)
+  @IsString()
   password: string;
 
   @Column({ type: 'enum', enum: UserRole })
@@ -39,7 +41,12 @@ export class User extends CoreEntity {
 
   @Column({ default: false })
   @Field(() => Boolean)
+  @IsBoolean()
   verified: boolean;
+
+  @Field(() => [Restaurant])
+  @OneToMany(() => Restaurant, (restaurant) => restaurant.owner)
+  restaurants: Restaurant[];
 
   @BeforeInsert() //password가 db에 반영되기 전에 작동
   @BeforeUpdate() //update할 때도 작동

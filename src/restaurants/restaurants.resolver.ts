@@ -1,42 +1,103 @@
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import {
+  Args,
+  Int,
+  Mutation,
+  Parent,
+  Query,
+  ResolveField,
+  Resolver,
+} from '@nestjs/graphql';
 import { Restaurant } from './entities/restaurant.entity';
 
 import { RestaurantsService } from './restaurants.service';
-import { createRestaurantDto } from './dtos/createRestaurant.dto';
-import { updateRestaurantDto } from './dtos/updateRestaurant.dto';
+import {
+  CreateRestaurantInput,
+  CreateRestaurantOutput,
+} from './dtos/createRestaurant.dto';
+import { CreateAccountOutput } from '../users/dtos/createAccount.dto';
+import { User, UserRole } from '../users/entities/user.entity';
+import { SetMetadata, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '../auth/auth.guard';
+import { AuthUser } from '../auth/auth-user.decorator';
+import { Role } from '../auth/role.decorator';
+import {
+  EditRestaurantInput,
+  EditRestaurantOutput,
+} from './dtos/editRestaurant.dto';
+import {
+  DeleteRestaurantInput,
+  DeleteRestaurantOutput,
+} from './dtos/deleteRestaurant.dto';
+import { Category } from './entities/category.entity';
+import { AllCategoriesOutput } from './dtos/all-Categories.dto';
+import { CategoryInput, CategoryOutput } from './dtos/category.dto';
+import { RestaurantOutput, RestaurantsInput } from './dtos/restaurants.dto';
 
 @Resolver(() => Restaurant)
 export class RestaurantsResolver {
   constructor(private readonly restaurantService: RestaurantsService) {}
-  @Query(() => Boolean)
-  isGood() {
-    return true;
-  }
-  @Query(() => [Restaurant])
-  restaurants(): Promise<Restaurant[]> {
-    return this.restaurantService.getAll();
-  }
-  @Mutation(() => Boolean)
+
+  @Mutation(() => CreateAccountOutput)
+  @Role(['Owner'])
   async createRestaurant(
-    @Args() createRestaurantDto: createRestaurantDto,
-  ): Promise<boolean> {
-    try {
-      await this.restaurantService.createRestaurant(createRestaurantDto);
-      return true;
-    } catch (e) {
-      console.log(e);
-      return false;
-    }
+    @AuthUser() authUser: User,
+    @Args('input')
+    createRestaurantInput: CreateRestaurantInput,
+  ): Promise<CreateRestaurantOutput> {
+    return this.restaurantService.createRestaurant(
+      authUser,
+      createRestaurantInput,
+    );
   }
-  @Mutation(() => Boolean)
-  async updateRestaurant(
-    @Args() updateRestaurantDto: updateRestaurantDto,
-  ): Promise<boolean> {
-    try {
-      await this.restaurantService.updateRestaurant(updateRestaurantDto);
-      return true;
-    } catch (e) {
-      return false;
-    }
+
+  @Mutation(() => EditRestaurantOutput)
+  @Role(['Owner'])
+  async editRestaurant(
+    @AuthUser() owner: User,
+    @Args('input') editRestaurantInput: EditRestaurantInput,
+  ): Promise<EditRestaurantOutput> {
+    return await this.restaurantService.editRestaurant(
+      owner,
+      editRestaurantInput,
+    );
+  }
+
+  @Mutation(() => DeleteRestaurantOutput)
+  @Role(['Owner'])
+  async deleteRestaurant(
+    @AuthUser() owner: User,
+    @Args() deleteRestaurantInput: DeleteRestaurantInput,
+  ) {
+    return this.restaurantService.deleteRestaurant(
+      owner,
+      deleteRestaurantInput,
+    );
+  }
+  @Query(() => RestaurantOutput)
+  restaurants(
+    @Args('input') restaurantsInput: RestaurantsInput,
+  ): Promise<RestaurantOutput> {
+    return this.restaurantService.allRestaurants(restaurantsInput);
+  }
+}
+@Resolver(() => Category)
+export class CategoryResolver {
+  constructor(private readonly restaurantService: RestaurantsService) {}
+
+  @Query(() => AllCategoriesOutput)
+  allCategories(): Promise<AllCategoriesOutput> {
+    return this.restaurantService.allCategories();
+  }
+
+  @ResolveField(() => Int)
+  restaurantCount(@Parent() category: Category): Promise<number> {
+    console.log(category);
+    return this.restaurantService.countRestaurants(category);
+  }
+  @Query(() => CategoryOutput)
+  category(
+    @Args('input') categoryInput: CategoryInput,
+  ): Promise<CategoryOutput> {
+    return this.restaurantService.findCategoryBySlug(categoryInput);
   }
 }

@@ -1,25 +1,24 @@
 import { Field, InputType, ObjectType } from '@nestjs/graphql';
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  RelationId,
+} from 'typeorm';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { CoreEntity } from '../../common/entities/core.entity';
+import { Category } from './category.entity';
+import { User } from '../../users/entities/user.entity';
 
-@InputType({ isAbstract: true }) // abstract로 설정하면 inputType으로 변환이 가능
+@InputType('RestaurantInputType', { isAbstract: true }) // abstract로 설정하면 inputType으로 변환이 가능
 @Entity()
 @ObjectType()
-export class Restaurant {
-  @PrimaryGeneratedColumn()
-  @Field(() => Number)
-  id: number;
-
+export class Restaurant extends CoreEntity {
   @Field(() => String)
   @Column()
   @IsString()
   name: string;
-
-  @Field(() => Boolean, { defaultValue: true })
-  @Column({ default: true })
-  @IsOptional()
-  @IsBoolean()
-  isVegan: boolean;
 
   @Field(() => String)
   @Column()
@@ -29,10 +28,19 @@ export class Restaurant {
   @Field(() => String)
   @Column()
   @IsString()
-  ownersName: string;
+  coverImg: string;
 
-  @Field(() => String)
-  @Column()
-  @IsString()
-  categoryName: string;
+  @Field(() => Category, { nullable: true })
+  @ManyToOne(() => Category, (category) => category.restaurants, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  category: Category;
+
+  @Field(() => User)
+  @ManyToOne(() => User, (user) => user.restaurants, { onDelete: 'CASCADE' })
+  owner: User;
+
+  @RelationId((restaurant: Restaurant) => restaurant.owner) //owner relationship의 id를 로드하게 해주는 필드
+  ownerId: number;
 }

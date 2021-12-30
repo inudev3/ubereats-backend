@@ -12,14 +12,11 @@ import { AuthUser } from '../auth/auth-user.decorator';
 import { SeeProfileInput, SeeProfileOutput } from './dtos/seeProfile.dto';
 import { EditProfileInput, EditProfileOutput } from './dtos/editProfile.dto';
 import { VerifyEmailInput, VerifyEmailOutput } from './dtos/VerifyEmail.dto';
+import { Role } from '../auth/role.decorator';
 
 @Resolver(() => User)
 export class UsersResolver {
   constructor(private readonly usersService: UserService) {}
-  @Query(() => Boolean)
-  hi() {
-    return true;
-  }
 
   @Mutation(() => CreateAccountOutput)
   async createAccount(
@@ -34,12 +31,12 @@ export class UsersResolver {
   }
 
   @Query(() => User)
-  @UseGuards(AuthGuard)
+  @Role(['Any'])
   Me(@AuthUser() user: User) {
     return user;
   }
 
-  @UseGuards(AuthGuard)
+  @Role(['Any'])
   @Query(() => SeeProfileOutput)
   async seeProfile(
     @Args() seeProfileInput: SeeProfileInput,
@@ -48,7 +45,7 @@ export class UsersResolver {
   }
 
   @Mutation(() => EditProfileOutput)
-  @UseGuards(AuthGuard)
+  @Role(['Any'])
   async editProfile(
     @AuthUser() authUser: User,
     @Args() editProfileInput: EditProfileInput,
