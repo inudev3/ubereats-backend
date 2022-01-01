@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { Restaurant } from './entities/restaurant.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Like, Raw, Repository } from 'typeorm';
 import {
   CreateRestaurantInput,
   CreateRestaurantOutput,
@@ -19,14 +19,25 @@ import {
 } from './dtos/deleteRestaurant.dto';
 import { AllCategoriesOutput } from './dtos/all-Categories.dto';
 import { CategoryInput, CategoryOutput } from './dtos/category.dto';
-import { RestaurantOutput, RestaurantsInput } from './dtos/restaurants.dto';
+import { RestaurantsInput, RestaurantsOutput } from './dtos/restaurants.dto';
+import { RestaurantInput, RestaurantOutput } from './dtos/restaurant.dto';
+import {
+  SearchRestaurantInput,
+  SearchRestaurantOutput,
+} from './dtos/searchRestaurant.dto';
+import { CreateDishInput, CreateDishOutput } from './dtos/createDish.dto';
+import { Dish } from './entities/dish.entity';
+import { EditDishInput, EditDishOutput } from './dtos/editDish.dto';
+import { DeleteDishInput, DeleteDishOutput } from './dtos/deleteDish.dto';
 
 @Injectable()
 export class RestaurantsService {
   constructor(
-    @InjectRepository(Restaurant) //decorator that makes repository from entity
+    //decorator that makes repository from entity
+    @InjectRepository(Restaurant)
     private readonly restaurants: Repository<Restaurant>,
-
+    @InjectRepository(Dish)
+    private readonly dishes: Repository<Dish>,
     private readonly categories: CategoryRepository, //custome repository 타입
   ) {} //inject repository
 
@@ -59,7 +70,13 @@ export class RestaurantsService {
   ): Promise<EditRestaurantOutput> {
     try {
       const { restaurantId } = editRestaurantInput;
-      await this.checkOwner(owner.id, editRestaurantInput.restaurantId);
+      const { restaurant, ok, error } = await this.checkOwner(
+        owner.id,
+        editRestaurantInput.restaurantId,
+      );
+      if (error) {
+        return { ok, error };
+      }
       let category: Category = null;
       if (editRestaurantInput.categoryName) {
         category = await this.categories.getOrCreate(
@@ -99,11 +116,12 @@ export class RestaurantsService {
           error: 'You are not authorized for this transaction',
         };
       }
-    } catch (e) {
       return {
-        ok: false,
-        error: 'Transaction failed.',
+        ok: true,
+        restaurant,
       };
+    } catch (e) {
+      throw new Error('check failed');
     }
   }
   async deleteRestaurant(
@@ -111,7 +129,13 @@ export class RestaurantsService {
     deleteRestaurantInput: DeleteRestaurantInput,
   ): Promise<DeleteRestaurantOutput> {
     try {
-      await this.checkOwner(owner.id, deleteRestaurantInput.restaurantId);
+      const { restaurant, ok, error } = await this.checkOwner(
+        owner.id,
+        deleteRestaurantInput.restaurantId,
+      );
+      if (error) {
+        return { ok, error };
+      }
       await this.restaurants.delete({ id: deleteRestaurantInput.restaurantId });
       return {
         ok: true,
@@ -171,7 +195,7 @@ export class RestaurantsService {
       };
     }
   }
-  async allRestaurants({ page }: RestaurantsInput): Promise<RestaurantOutput> {
+  async allRestaurants({ page }: RestaurantsInput): Promise<RestaurantsOutput> {
     try {
       const [restaurants, totalResults] = await this.restaurants.findAndCount({
         take: 25,
@@ -183,6 +207,137 @@ export class RestaurantsService {
         totalPages: Math.ceil(totalResults / 25),
         totalResults,
       };
-    } catch (error) {}
+    } catch (error) {
+      return {
+        ok: false,
+        error: 'Could not load restaurants ',
+      };
+    }
+  }
+
+  async findRestaurantById({
+    restaurantId,
+  }: RestaurantInput): Promise<RestaurantOutput> {
+    try {
+      const restaurant = await this.restaurants.findOne(restaurantId, {
+        relations: ['menu'],
+      });
+      if (!restaurant) {
+        return {
+          ok: false,
+          error: 'Restaurant Not Found',
+        };
+      }
+      return {
+        ok: true,
+        result: restaurant,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: 'Could not find restaurant',
+      };
+    }
+  }
+  async searchRestaurantByName({
+    query,
+    page,
+  }: SearchRestaurantInput): Promise<SearchRestaurantOutput> {
+    try {
+      const [restaurants, totalResults] = await this.restaurants.findAndCount({
+        where: { name: Raw((name) => `${name} ILIKE '%${query}%'`) }, //sql notation for search
+        skip: (page - 1) * 25,
+        take: 25,
+      });
+      return {
+        ok: true,
+        restaurants,
+        totalResults,
+        totalPages: Math.ceil(totalResults / 5),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: 'Could not find restaurant for the keyword',
+      };
+    }
+  }
+  async createDish(
+    owner: User,
+    createDishInput: CreateDishInput,
+  ): Promise<CreateDishOutput> {
+    try {
+      const { restaurant, ok, error } = await this.checkOwner(
+        owner.id,
+        createDishInput.restaurantId,
+      );
+      if (error) {
+        return {
+          ok,
+          error,
+        };
+      }
+      const dish = await this.dishes.save(
+        this.dishes.create({ ...createDishInput, restaurant }),
+      );
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: 'Could not create dish',
+      };
+    }
+  }
+  async editDish(
+    owner: User,
+    editDishInput: EditDishInput,
+  ): Promise<EditDishOutput> {
+    try {
+      const { dish, ok, error } = await this.checkDishOwner(
+        owner.id,
+        editDishInput.dishId,
+      );
+      if (error) {
+        return { ok, error };
+      }
+      await this.dishes.save([{ id: editDishInput.dishId, ...editDishInput }]);
+      return { ok: true };
+    } catch {
+      return { ok: false, error: 'Could not update dish' };
+    }
+  }
+  async checkDishOwner(ownerId: number, dishId: number) {
+    try {
+      const dish = await this.dishes.findOne(dishId, {
+        relations: ['restaurant'],
+      });
+      if (!dish) {
+        return { ok: false, error: 'Dish not found' };
+      }
+      if (ownerId !== dish.restaurant.ownerId) {
+        return { ok: false, error: 'You are not authorized' };
+      }
+      return { ok: true, dish };
+    } catch {
+      throw new Error();
+    }
+  }
+  async deleteDish(
+    owner: User,
+    deleteDishInput: DeleteDishInput,
+  ): Promise<DeleteDishOutput> {
+    try {
+      const { dish, ok, error } = await this.checkDishOwner(
+        owner.id,
+        deleteDishInput.dishId,
+      );
+      if (error) {
+        return { ok, error };
+      }
+      await this.dishes.delete(deleteDishInput.dishId);
+      return { ok: true };
+    } catch {
+      return { ok: false, error: 'Could  delete dish' };
+    }
   }
 }
